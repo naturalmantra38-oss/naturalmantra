@@ -198,20 +198,38 @@ const ProductDetailPage = () => {
             </div>
 
             {/* PRICE & DISCOUNT */}
-            <div className="flex items-baseline space-x-4 p-4 bg-brand-cream rounded-2xl border border-brand-100">
-              <span className="text-3xl font-extrabold text-brand-700">
-                {DEFAULT_CURRENCY}{price}
+            <div className="flex items-baseline justify-between p-4 bg-brand-cream rounded-2xl border border-brand-100">
+              <div className="flex items-baseline space-x-4">
+                <span className="text-3xl font-extrabold text-brand-700">
+                  {DEFAULT_CURRENCY}{price}
+                </span>
+                {mrp > price && (
+                  <span className="text-lg text-gray-400 line-through">
+                    {DEFAULT_CURRENCY}{mrp}
+                  </span>
+                )}
+                {mrp > price && (
+                  <span className="text-xs font-extrabold bg-red-700 text-white px-2.5 py-1 rounded-md uppercase">
+                    Save {Math.round(((mrp - price) / mrp) * 100)}%
+                  </span>
+                )}
+              </div>
+              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold px-2.5 py-1 rounded-md">
+                COD Available
               </span>
-              {mrp > price && (
-                <span className="text-lg text-gray-400 line-through">
-                  {DEFAULT_CURRENCY}{mrp}
-                </span>
-              )}
-              {mrp > price && (
-                <span className="text-xs font-extrabold bg-red-700 text-white px-2.5 py-1 rounded-md uppercase">
-                  Save {Math.round(((mrp - price) / mrp) * 100)}%
-                </span>
-              )}
+            </div>
+
+            {/* PRODUCT METADATA */}
+            <div className="grid grid-cols-2 gap-3 text-xs bg-gray-50 p-3.5 rounded-xl border border-gray-200">
+              <div><span className="text-gray-500">Brand:</span> <strong className="text-gray-800">Natural Mantra</strong></div>
+              <div><span className="text-gray-500">Net Weight / Qty:</span> <strong className="text-gray-800">{product.weightQty ? `${product.weightQty} ${product.unit || ''}` : 'Standard Pack'}</strong></div>
+              <div><span className="text-gray-500">Product Code / SKU:</span> <strong className="text-gray-800 font-mono">{product.sku}</strong></div>
+              <div>
+                <span className="text-gray-500">Availability:</span>{' '}
+                <strong className={product.stock > 0 ? 'text-emerald-700' : 'text-red-600'}>
+                  {product.stock > 0 ? `In Stock (${product.stock} units)` : 'Out of Stock'}
+                </strong>
+              </div>
             </div>
 
             <p className="text-sm text-gray-600 leading-relaxed">
@@ -251,7 +269,8 @@ const ProductDetailPage = () => {
                 <div className="flex items-center border border-gray-300 rounded-xl bg-gray-50 overflow-hidden">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="px-3.5 py-2 text-gray-600 font-bold hover:bg-gray-200"
+                    disabled={product.stock === 0}
+                    className="px-3.5 py-2 text-gray-600 font-bold hover:bg-gray-200 disabled:opacity-50"
                   >
                     -
                   </button>
@@ -259,8 +278,9 @@ const ProductDetailPage = () => {
                     {quantity}
                   </span>
                   <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="px-3.5 py-2 text-gray-600 font-bold hover:bg-gray-200"
+                    onClick={() => setQuantity(Math.min(product.stock || 99, quantity + 1))}
+                    disabled={product.stock === 0 || quantity >= product.stock}
+                    className="px-3.5 py-2 text-gray-600 font-bold hover:bg-gray-200 disabled:opacity-50"
                   >
                     +
                   </button>
@@ -269,17 +289,27 @@ const ProductDetailPage = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <button
-                  onClick={() => addToCart(product, selectedVariant, quantity)}
-                  className="py-4 px-6 bg-brand-50 hover:bg-brand-100 text-brand-700 border-2 border-brand-700 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all"
+                  onClick={() => product.stock > 0 && addToCart(product, selectedVariant, quantity)}
+                  disabled={product.stock === 0}
+                  className={`py-4 px-6 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all ${
+                    product.stock === 0
+                      ? 'bg-gray-100 text-gray-400 border border-gray-300 cursor-not-allowed'
+                      : 'bg-brand-50 hover:bg-brand-100 text-brand-700 border-2 border-brand-700'
+                  }`}
                 >
                   <ShoppingBag className="w-4 h-4" />
-                  <span>ADD TO CART</span>
+                  <span>{product.stock === 0 ? 'OUT OF STOCK' : 'ADD TO CART'}</span>
                 </button>
                 <button
-                  onClick={handleBuyNow}
-                  className="py-4 px-6 bg-brand-700 hover:bg-brand-800 text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all shadow-md"
+                  onClick={() => product.stock > 0 && handleBuyNow()}
+                  disabled={product.stock === 0}
+                  className={`py-4 px-6 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all shadow-md ${
+                    product.stock === 0
+                      ? 'bg-gray-400 text-white cursor-not-allowed'
+                      : 'bg-brand-700 hover:bg-brand-800 text-white'
+                  }`}
                 >
-                  <span>BUY IT NOW</span>
+                  <span>{product.stock === 0 ? 'OUT OF STOCK' : 'BUY IT NOW'}</span>
                 </button>
               </div>
             </div>

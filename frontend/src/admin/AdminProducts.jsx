@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { productService, categoryService } from '../services/api';
+import React, { useState, useEffect, useRef } from 'react';
+import { productService, categoryService, uploadService } from '../services/api';
 import { MOCK_PRODUCTS, MOCK_CATEGORIES } from '../data/mockData';
-import { Plus, Edit2, Trash2, X, Search, Image as ImageIcon } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Search, Image as ImageIcon, Upload, Link as LinkIcon, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { DEFAULT_CURRENCY } from '../config';
 
 const AdminProducts = () => {
@@ -10,6 +10,11 @@ const AdminProducts = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const [showUrlFallback, setShowUrlFallback] = useState(false);
+  const fileInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -48,6 +53,8 @@ const AdminProducts = () => {
 
   const openAddModal = () => {
     setEditingProduct(null);
+    setUploadError(null);
+    setShowUrlFallback(false);
     setFormData({
       name: '',
       slug: '',
@@ -60,7 +67,7 @@ const AdminProducts = () => {
       description: '',
       ingredients: '',
       howToUse: '',
-      imageUrl: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=800',
+      imageUrl: '',
       isFeatured: false,
       isBestSeller: false,
       seoTitle: '',
@@ -71,6 +78,8 @@ const AdminProducts = () => {
 
   const openEditModal = (product) => {
     setEditingProduct(product);
+    setUploadError(null);
+    setShowUrlFallback(false);
     setFormData({
       name: product.name,
       slug: product.slug,
@@ -92,14 +101,90 @@ const AdminProducts = () => {
     setShowModal(true);
   };
 
+  const handleImageFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate image type
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Invalid file type. Please select an image (JPEG, PNG, WebP, GIF, SVG).');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('File size too large (max 5MB). Please select a smaller image.');
+      return;
+    }
+
+    setUploadError(null);
+    setUploading(true);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const rawDataUrl = event.target.result;
+
+        // Resize & compress via Canvas for quick performance and clean Data URL payload
+        const img = new Image();
+        img.onload = async () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 1200;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+          // Upload image via service (returns static URL or Data URL)
+          const uploadRes = await uploadService.uploadImage(compressedDataUrl);
+          const finalUrl = uploadRes?.url || compressedDataUrl;
+
+          setFormData((prev) => ({ ...prev, imageUrl: finalUrl }));
+          setUploading(false);
+        };
+
+        img.onerror = () => {
+          setFormData((prev) => ({ ...prev, imageUrl: rawDataUrl }));
+          setUploading(false);
+        };
+        img.src = rawDataUrl;
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Failed processing image upload:', err);
+      setUploadError('Failed to process image. Please try again.');
+      setUploading(false);
+    }
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
+
+    // Fallback default image if no image was uploaded or entered
+    const finalImg = formData.imageUrl || 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&q=80&w=800';
+
     const productPayload = {
       ...formData,
       price: Number(formData.price),
       mrp: Number(formData.mrp),
       stock: Number(formData.stock),
-      images: [formData.imageUrl]
+      imageUrl: finalImg,
+      images: [finalImg]
     };
 
     if (editingProduct) {
@@ -179,7 +264,7 @@ const AdminProducts = () => {
             {filtered.map((prod) => (
               <tr key={prod._id} className="hover:bg-gray-800/40">
                 <td className="p-4 flex items-center space-x-3">
-                  <img src={prod.images?.[0] || prod.image} alt="" className="w-10 h-10 object-cover rounded-lg bg-gray-800" />
+                  <img src={prod.images?.[0] || prod.image || prod.imageUrl} alt="" className="w-10 h-10 object-cover rounded-lg bg-gray-800 border border-gray-700" />
                   <span className="font-bold text-white max-w-xs truncate">{prod.name}</span>
                 </td>
                 <td className="p-4 font-mono text-gray-400">{prod.sku}</td>
@@ -230,6 +315,129 @@ const AdminProducts = () => {
             </div>
 
             <form onSubmit={handleSave} className="space-y-4">
+              {/* IMAGE UPLOAD SECTION */}
+              <div className="bg-gray-800/40 border border-gray-700/60 rounded-2xl p-4 space-y-3">
+                <label className="font-bold text-gray-200 block text-xs uppercase tracking-wider">
+                  Product Image *
+                </label>
+
+                {/* Hidden File Input */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImageFileChange}
+                  accept="image/png, image/jpeg, image/webp, image/gif, image/svg+xml"
+                  className="hidden"
+                />
+
+                {/* PREVIEW VIEW (If image uploaded or exists) */}
+                {formData.imageUrl ? (
+                  <div className="flex items-center space-x-4 bg-gray-900/80 p-3 rounded-xl border border-gray-700">
+                    <img
+                      src={formData.imageUrl}
+                      alt="Product Preview"
+                      className="w-20 h-20 object-cover rounded-xl border border-gray-700 shadow-md bg-gray-800"
+                    />
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center space-x-1.5 text-green-400 font-bold text-xs">
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Product Image Ready</span>
+                      </div>
+                      <p className="text-[11px] text-gray-400 truncate max-w-xs">
+                        {formData.imageUrl.startsWith('data:') ? 'Uploaded image file' : formData.imageUrl}
+                      </p>
+                      <div className="flex items-center space-x-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploading}
+                          className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-white font-semibold text-[11px] rounded-lg border border-gray-600 flex items-center space-x-1"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${uploading ? 'animate-spin' : ''}`} />
+                          <span>Change Image</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, imageUrl: '' })}
+                          className="px-3 py-1 bg-red-950/60 hover:bg-red-900/80 text-red-300 font-semibold text-[11px] rounded-lg border border-red-800/50"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* DROPZONE / UPLOAD BUTTON AREA */
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-gray-700 hover:border-brand-gold bg-gray-900/50 hover:bg-gray-800/40 rounded-xl p-6 text-center cursor-pointer transition-all duration-200 group"
+                  >
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <div className="w-12 h-12 bg-gray-800 group-hover:bg-brand-gold/20 rounded-full flex items-center justify-center transition-colors">
+                        {uploading ? (
+                          <RefreshCw className="w-6 h-6 text-brand-gold animate-spin" />
+                        ) : (
+                          <Upload className="w-6 h-6 text-brand-gold group-hover:scale-110 transition-transform" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-bold text-white text-xs">
+                          {uploading ? 'Processing Image...' : 'Click to Upload Product Image'}
+                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          Select JPEG, PNG, WebP, GIF or SVG (max 5MB)
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="mt-1 px-4 py-1.5 bg-brand-gold hover:bg-brand-goldHover text-brand-950 font-bold text-[11px] rounded-lg shadow-sm"
+                      >
+                        Choose File from Computer
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ERROR BANNER */}
+                {uploadError && (
+                  <div className="flex items-center space-x-2 text-red-400 bg-red-950/40 border border-red-800/60 p-2.5 rounded-xl text-[11px]">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{uploadError}</span>
+                  </div>
+                )}
+
+                {/* OPTIONAL EXTERNAL IMAGE URL FALLBACK TOGGLE */}
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowUrlFallback(!showUrlFallback)}
+                    className="text-[11px] text-gray-400 hover:text-brand-gold flex items-center space-x-1 underline decoration-dotted"
+                  >
+                    <LinkIcon className="w-3 h-3" />
+                    <span>{showUrlFallback ? 'Hide URL link field' : 'Or paste an external image URL link'}</span>
+                  </button>
+
+                  {showUrlFallback && (
+                    <div className="mt-2 space-y-1">
+                      <input
+                        type="text"
+                        placeholder="https://example.com/image.jpg"
+                        value={formData.imageUrl}
+                        onChange={(e) => {
+                          setFormData({ ...formData, imageUrl: e.target.value });
+                          setUploadError(null);
+                        }}
+                        className="w-full p-2.5 bg-gray-900 border border-gray-700 rounded-xl text-white text-xs placeholder:text-gray-600"
+                      />
+                      <p className="text-[10px] text-gray-500">
+                        Optional fallback: Direct image link from Unsplash, CDN, or hosted server.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* PRODUCT DETAILS FORM FIELDS */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="font-bold text-gray-300 block mb-1">Product Name *</label>
@@ -252,6 +460,30 @@ const AdminProducts = () => {
                   />
                 </div>
                 <div>
+                  <label className="font-bold text-gray-300 block mb-1">Category *</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full p-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white"
+                  >
+                    {categories.map((c) => (
+                      <option key={c._id} value={c._id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="font-bold text-gray-300 block mb-1">Stock Quantity *</label>
+                  <input
+                    type="number"
+                    value={formData.stock}
+                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                    required
+                    className="w-full p-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white"
+                  />
+                </div>
+                <div>
                   <label className="font-bold text-gray-300 block mb-1">Price (₹) *</label>
                   <input
                     type="number"
@@ -267,26 +499,6 @@ const AdminProducts = () => {
                     type="number"
                     value={formData.mrp}
                     onChange={(e) => setFormData({ ...formData, mrp: e.target.value })}
-                    required
-                    className="w-full p-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-gray-300 block mb-1">Stock Quantity *</label>
-                  <input
-                    type="number"
-                    value={formData.stock}
-                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                    required
-                    className="w-full p-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-gray-300 block mb-1">Image URL *</label>
-                  <input
-                    type="text"
-                    value={formData.imageUrl}
-                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
                     required
                     className="w-full p-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white"
                   />
@@ -337,15 +549,17 @@ const AdminProducts = () => {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-gray-800 text-gray-300 rounded-xl"
+                  className="px-4 py-2 bg-gray-800 text-gray-300 rounded-xl font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-brand-gold text-brand-950 font-bold rounded-xl"
+                  disabled={uploading}
+                  className="px-6 py-2 bg-brand-gold hover:bg-brand-goldHover text-brand-950 font-bold rounded-xl disabled:opacity-50 flex items-center space-x-2"
                 >
-                  Save Product
+                  {uploading && <RefreshCw className="w-4 h-4 animate-spin" />}
+                  <span>Save Product</span>
                 </button>
               </div>
             </form>

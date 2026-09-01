@@ -23,7 +23,7 @@ const CheckoutPage = () => {
     pincode: ''
   });
 
-  const [paymentMethod, setPaymentMethod] = useState('UPI');
+  const [paymentMethod, setPaymentMethod] = useState('COD');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
 

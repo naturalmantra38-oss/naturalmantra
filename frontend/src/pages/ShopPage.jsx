@@ -15,16 +15,20 @@ const ShopPage = () => {
   // Active Filter States
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || 'all');
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
-  const [maxPrice, setMaxPrice] = useState(1000);
+  const [maxPrice, setMaxPrice] = useState(3000);
   const [minRating, setMinRating] = useState(0);
   const [sortBy, setSortBy] = useState('featured');
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [onlyBestSellers, setOnlyBestSellers] = useState(searchParams.get('filter') === 'best-sellers');
 
   useEffect(() => {
     const categoryParam = searchParams.get('category');
     const searchParam = searchParams.get('search');
+    const filterParam = searchParams.get('filter');
     if (categoryParam) setSelectedCategory(categoryParam);
     if (searchParam) setSearchQuery(searchParam);
+    if (filterParam === 'best-sellers') setOnlyBestSellers(true);
+    else setOnlyBestSellers(false);
   }, [searchParams]);
 
   useEffect(() => {
@@ -47,6 +51,9 @@ const ShopPage = () => {
   const filteredProducts = useMemo(() => {
     return products
       .filter((p) => {
+        // Best Sellers filter
+        if (onlyBestSellers && !p.isBestSeller) return false;
+
         // Category check
         if (selectedCategory !== 'all') {
           const catSlug = p.category?.slug || p.category;
@@ -77,14 +84,15 @@ const ShopPage = () => {
         if (sortBy === 'newest') return b._id.localeCompare(a._id);
         return 0; // Default featured
       });
-  }, [products, selectedCategory, searchQuery, maxPrice, minRating, sortBy]);
+  }, [products, selectedCategory, searchQuery, maxPrice, minRating, sortBy, onlyBestSellers]);
 
   const resetFilters = () => {
     setSelectedCategory('all');
     setSearchQuery('');
-    setMaxPrice(1000);
+    setMaxPrice(3000);
     setMinRating(0);
     setSortBy('featured');
+    setOnlyBestSellers(false);
     setSearchParams({});
   };
 
@@ -194,7 +202,7 @@ const ShopPage = () => {
               <input
                 type="range"
                 min="100"
-                max="1000"
+                max="3000"
                 step="50"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(Number(e.target.value))}
@@ -202,7 +210,7 @@ const ShopPage = () => {
               />
               <div className="flex justify-between text-[11px] text-gray-400">
                 <span>₹100</span>
-                <span>₹1,000</span>
+                <span>₹3,000</span>
               </div>
             </div>
 

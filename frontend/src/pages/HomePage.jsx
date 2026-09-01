@@ -55,16 +55,19 @@ const HomePage = () => {
   // Automatic hero slider transition
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentSlideIndex((prev) => (prev + 1) % heroSlides.length);
+      setCurrentSlideIndex((prev) => (prev + 1) % (heroSlides?.length || 1));
     }, 6000);
     return () => clearInterval(timer);
-  }, [heroSlides.length]);
+  }, [heroSlides?.length]);
 
-  const currentSlide = heroSlides[currentSlideIndex] || MOCK_HERO_SLIDES[0];
+  const currentSlide = (heroSlides && heroSlides[currentSlideIndex]) || MOCK_HERO_SLIDES[0];
+
+  const bestSellerProducts = (products || []).filter(p => p?.isBestSeller);
+  const bestSellersList = bestSellerProducts.length > 0 ? bestSellerProducts : (products || []);
 
   const filteredBestSellers = activeCategoryTab === 'all'
-    ? products
-    : products.filter(p => p.category?.slug === activeCategoryTab || p.category === activeCategoryTab);
+    ? bestSellersList
+    : bestSellersList.filter(p => p.category?.slug === activeCategoryTab || p.category === activeCategoryTab || p.category?._id === activeCategoryTab);
 
   // JSON-LD Organization Schema for SEO
   const orgSchema = {
@@ -225,6 +228,7 @@ const HomePage = () => {
                   <img
                     src={cat.image}
                     alt={cat.name}
+                    onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?auto=format&fit=crop&q=80&w=800'; }}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-108"
                     loading="lazy"
                   />
@@ -275,7 +279,7 @@ const HomePage = () => {
               >
                 All Best Sellers
               </button>
-              {categories.slice(0, 3).map((cat) => (
+              {categories.map((cat) => (
                 <button
                   key={cat._id}
                   onClick={() => setActiveCategoryTab(cat.slug)}
@@ -291,7 +295,7 @@ const HomePage = () => {
             </div>
           </div>
 
-          <ProductGrid products={filteredBestSellers.slice(0, 4)} columns={4} />
+          <ProductGrid products={filteredBestSellers.slice(0, 8)} columns={4} />
 
           <div className="text-center pt-4">
             <Link

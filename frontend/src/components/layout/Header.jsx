@@ -105,7 +105,7 @@ const Header = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-3 group">
             <img
-              src="/assets/natural-mantra-logo.svg"
+              src="/assets/logo.jpg"
               alt="Natural Mantra Logo"
               className="h-10 md:h-12 w-auto transition-transform duration-300 group-hover:scale-105"
             />

@@ -29,7 +29,10 @@ api.interceptors.request.use((config) => {
 const withFallback = async (requestFn, mockFallbackData) => {
   try {
     const response = await requestFn();
-    return response.data;
+    if (response?.data) {
+      return response.data;
+    }
+    return mockFallbackData;
   } catch (error) {
     console.warn('API call failed or offline, returning mock fallback data:', error?.message);
     return mockFallbackData;
@@ -37,19 +40,32 @@ const withFallback = async (requestFn, mockFallbackData) => {
 };
 
 export const productService = {
-  getProducts: (params = {}) =>
-    withFallback(
+  getProducts: async (params = {}) => {
+    const data = await withFallback(
       () => api.get('/products', { params }),
       { success: true, count: MOCK_PRODUCTS.length, products: MOCK_PRODUCTS }
-    ),
-  getProductBySlug: (slug) =>
-    withFallback(
+    );
+    if (!data || !Array.isArray(data.products) || data.products.length === 0) {
+      return { success: true, count: MOCK_PRODUCTS.length, products: MOCK_PRODUCTS };
+    }
+    return data;
+  },
+  getProductBySlug: async (slug) => {
+    const data = await withFallback(
       () => api.get(`/products/${slug}`),
       {
         success: true,
-        product: MOCK_PRODUCTS.find(p => p.slug === slug) || MOCK_PRODUCTS[0]
+        product: MOCK_PRODUCTS.find(p => p.slug === slug || p._id === slug) || MOCK_PRODUCTS[0]
       }
-    ),
+    );
+    if (!data || !data.product) {
+      return {
+        success: true,
+        product: MOCK_PRODUCTS.find(p => p.slug === slug || p._id === slug) || MOCK_PRODUCTS[0]
+      };
+    }
+    return data;
+  },
   createProduct: (data) =>
     withFallback(
       () => api.post('/products', data),
@@ -68,11 +84,16 @@ export const productService = {
 };
 
 export const categoryService = {
-  getCategories: () =>
-    withFallback(
+  getCategories: async () => {
+    const data = await withFallback(
       () => api.get('/categories'),
       { success: true, categories: MOCK_CATEGORIES }
-    ),
+    );
+    if (!data || !Array.isArray(data.categories) || data.categories.length === 0) {
+      return { success: true, categories: MOCK_CATEGORIES };
+    }
+    return data;
+  },
   createCategory: (data) =>
     withFallback(
       () => api.post('/categories', data),
@@ -173,6 +194,15 @@ export const cmsService = {
       () => api.post('/newsletter', { email }),
       { success: true, message: 'Subscribed to newsletter!' }
     )
+};
+
+export const uploadService = {
+  uploadImage: async (imageData) => {
+    return withFallback(
+      () => api.post('/upload', { image: imageData }),
+      { success: true, url: imageData }
+    );
+  }
 };
 
 export default api;
