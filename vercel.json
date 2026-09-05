@@ -11,11 +11,16 @@
   ],
   "routes": [
     {
-      "handle": "filesystem"
+      "src": "/assets/(.*)",
+      "dest": "/frontend/assets/$1"
     },
     {
-      "src": "/.*",
-      "dest": "/index.html"
+      "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|ico|svg|json|ttf|woff|woff2|xml|txt|webmanifest))",
+      "dest": "/frontend/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/index.html"
     }
   ]
 }
