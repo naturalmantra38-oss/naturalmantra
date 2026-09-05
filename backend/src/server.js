@@ -197,3 +197,6 @@ app.use(express.static('../frontend/dist'));
 app.listen(PORT, () => {
   console.log(`🌿 Natural Mantra API Server running on port ${PORT} with ${productsStore.length} products loaded`);
 });
+
+export default app;
+
