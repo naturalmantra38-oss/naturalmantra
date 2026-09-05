@@ -123,7 +123,7 @@ const AdminLayout = () => {
 
           <div className="flex items-center space-x-4 text-xs">
             <span className="text-gray-400">
-              Signed in: <strong className="text-white">{user.name}</strong>
+              Signed in: <strong className="text-white">{user?.name || 'Admin'}</strong>
             </span>
             <Link to="/" target="_blank" className="px-3 py-1.5 bg-gray-800 text-brand-gold hover:bg-gray-700 rounded-lg font-bold flex items-center space-x-1">
               <span>View Site</span>

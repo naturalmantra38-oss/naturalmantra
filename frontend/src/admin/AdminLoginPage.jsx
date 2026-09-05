@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Lock, Mail, ShieldAlert } from 'lucide-react';
@@ -7,8 +7,14 @@ const AdminLoginPage = () => {
   const [email, setEmail] = useState('admin@naturalmantra.com');
   const [password, setPassword] = useState('Admin@123456');
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const { login, isAdmin } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isAdmin) {
+      navigate('/admin');
+    }
+  }, [isAdmin, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

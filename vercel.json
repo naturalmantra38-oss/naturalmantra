@@ -11,8 +11,12 @@
   ],
   "routes": [
     {
-      "src": "/(.*)",
-      "dest": "/frontend/$1"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/.*",
+      "dest": "/index.html"
     }
   ]
 }
+
